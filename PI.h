@@ -18,7 +18,7 @@ struct PI {
 };
 
 void PI_INIT(struct PI* pi, float kp, float ki, float Ts, float aw_min, float aw_max);
-void PI_CALC(struct PI* pi, float x,float ref);
+double PI_CALC(struct PI* pi, float x,float ref);
 
 
 #endif /* PI_H_ */

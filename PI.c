@@ -18,7 +18,7 @@ void PI_INIT(struct PI* pi, float kp, float ki, float ts, float aw_max, float aw
 
 }
 
-void PI_CALC(struct PI* PI, float x,float ref)
+double PI_CALC(struct PI* PI, float x,float ref)
 {   
     PI->ref = ref;
 
