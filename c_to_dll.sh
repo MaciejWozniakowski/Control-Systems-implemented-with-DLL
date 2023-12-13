@@ -5,5 +5,5 @@ output+=".o"
 dll=$1
 dll=${dll%.*}
 dll+=".dll"
-gcc -c -fPIC $1 -o $output -lm
+gcc -c -v -fPIC $1 -o $output 
 gcc -shared -o $dll $output
