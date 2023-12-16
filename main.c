@@ -1,88 +1,137 @@
 #include <stdio.h>
 #include "DllHeader.h"
-struct PI {
-    float x;
-    float y;
-    float y_1;
-    float x_1;
-    float kp;
-    float ki;
-    float Ts;
-    float aw_min;
-    float aw_max;
-    float i;
-    float p;
-    float ref;
+#include <math.h>
+#define TS 0.0001
+#define invTS 10000
+
+struct PI{
+	float x;
+	float y;
+	float y_1;
+	float x_1;
+	float Ts;
+	float Kr;
+	float Ti;
+	float integ;
+	float final_output;
+	float integ_1;
+	float final_output_before;
+	float max;
+	float min;
 };
 
-
-
-void PI_INIT(struct PI* pi, float kp, float ki, float ts, float aw_max, float aw_min)
-{
-    pi->kp = kp;
-    pi->ki = ki;
-    pi->Ts = ts;
-    pi->aw_max = aw_max;
-    pi->aw_min = aw_min;
-    pi->y_1 = 0;
-    pi->x_1 = 0;
-    pi->x = 0;
-    pi->x_1 = 0;
-    pi->i = 0;
-    pi->p = 0;
-    pi->ref = 0;
-
+void PIInit(struct PI *pi, float Kr, float Ti,  float Ts,float max, float min){
+	pi->y=0;
+	pi->x=0;
+	pi->y_1=0;
+	pi->x_1 = 0;
+	pi->Kr=Kr;
+	pi->Ts=Ts;
+	pi->Ti=Ti;
+	pi->integ = 0;
+	pi->final_output = 0;
+	pi->integ_1 = 0;
+	pi->final_output_before = 0;
+	pi->max = max;
+	pi->min = min;
+	
 }
 
-double PI_CALC(struct PI* PI, float x,float ref)
-{   
-    PI->ref = ref;
-    PI->x =PI->ref-x;
+double PICalc(struct PI *pi, float x, float feedback){
+	pi->x=x - feedback;
+	
+	if (pi->final_output_before < pi->max && pi->final_output_before > pi->min)
+	{
+		pi->integ=(((pi->Ts/pi->Ti * pi->x * pi->Kr) / 2.0) + ((pi->Ts/pi->Ti * pi->x_1 * pi->Kr) / 2.0) +  pi->integ_1);
 
-    //PI->i = i;
+	}
+	else
+	{
+		pi->integ = pi->integ_1;
+	}
+	
+	pi->final_output = pi->Kr*pi->x + pi->integ;
+	if(pi->final_output >= pi->max)
+	{
+		pi->final_output = pi->max;
+	}
+	else if(pi->final_output <= pi->min)
+	{
+		pi->final_output = pi->min;
+	}
 
-    //PI->i = PI->i + PI->Ts * PI->x;
-    //PI->y = PI->x * PI->kp + PI->ki *PI-> i;
-    //if (PI->y >= PI->aw_max || PI->y <= PI->aw_min)
-    // {PI->y = PI->xPI->kp;
-    // }
-   // PI->y = (PI->kp * PI->x) - (PI->kp * PI->x_1) + (PI->ki * PI->Ts * PI->x) / 2 + (PI->ki * PI->Ts * PI->x_1) / 2 + (PI->y_1);
-    PI->y = (PI->kp * PI->x) - (PI->kp * PI->x_1) + (PI->ki * PI->Ts * PI->x) / 2 + (PI->ki * PI->Ts * PI->x_1) / 2 + (PI->y_1);
+  return pi->final_output;
+	pi->x_1 = pi->x;
 
-    if (PI->y >= PI->aw_max || PI->y < PI->aw_min) {
-        PI->y = PI->aw_max;
-        //PI->y = (PI->kp * PI->x) - (PI->kp * PI->x_1) + PI->y_1;
-    }
+	pi->integ_1 = pi->integ;
+	pi->y_1=pi->final_output;
 
-
-  return PI->y;
-    PI->y_1 = PI->y;
-    PI->x_1 = PI->x;
-
-
-    
+	pi->final_output_before = pi->final_output;
 }
 struct PI PI1;
+// implementing improved modulator
+
+int * modulator(float power){
+  static int outputs[4];
+  float x1 = 0, x2 = 0;
+  if(x1>2.0){ // counter reset, so that sin function takes memory efficient args
+    x1 = 0;
+  }
+  if(sin(invTS*x1)>=0){ // transistor 1 and 2 signals are inverted
+    x1+= 0.000001;
+    outputs[0] = 1;
+    outputs[1] = 0;
+  }
+    
+  if(sin(invTS*x1)<0){
+
+    x1+= 0.000001;
+    outputs[0] = 0;
+    outputs[1] = 1;
+  }
+ // transistor 3 and 4 signals dictate the power of the converter
+ // signal 4 is signal 3 inverted  
+  if(x2 > 2.0){
+    x2 = 0;
+  }
+  if(sin(invTS*x2 +(invTS * power))>= 0){
+    x2 += 0.000001;
+    outputs[2] = 1;
+    outputs[3] = 0;
+  }
+  if(sin(invTS*x2 +(invTS * power))< 0){
+    x2 += 0.000001;
+    outputs[2] = 0;
+    outputs[3] = 1;
+  }
+  
+  return outputs;
+}
 
 
 DLLEXPORT void plecsSetSizes(struct SimulationSizes* aSizes)
 {
-aSizes->numInputs = 2;
+aSizes->numInputs = 1;
 aSizes->numOutputs = 1;
 aSizes->numStates = 0;
 aSizes->numParameters = 0; //number of user parameters passed in
 }
 DLLEXPORT void plecsStart(struct SimulationState* aState){
-  float kp = 1, ki = 1, ts = 0.0001, aw_max = 0, aw_min = 2;
+  float kr = 0.0, ti = 100000.0, aw_max = 2.0, aw_min = 0.0;
 
-  PI_INIT(&PI1, kp, ki, ts, aw_max, aw_min);
+  PIInit(&PI1, kr, ti, TS, aw_max, aw_min);
 
 }
 
 DLLEXPORT void plecsOutput(struct SimulationState* aState)
 {
-
-aState->outputs[0] =2;// PI_CALC(&PI1, aState->inputs[0],5); // input 0 is feedback, input 1 is refference value  
+  int *phaseshiftOutputs;
+  phaseshiftOutputs = modulator(aState->numInputs[0])
+aState->outputs[0] = * phaseshiftOutputs[0]
+aState->outputs[1] = * phaseshiftOutputs[1]
+aState->outputs[2] = * phaseshiftOutputs[2]
+aState->outputs[3] = * phaseshiftOutputs[3]
+//aState->outputs[0] = PICalc(&PI1, aState->inputs[0], aState->inputs[1]); // input 0 is refference, input 1 is feedback
 //aState->outputs[1] = aState->inputs[0];
 }
 
