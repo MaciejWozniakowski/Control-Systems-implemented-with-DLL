@@ -3,7 +3,7 @@
 #include <math.h>
 #define TS 0.0001
 #define invTS 10000
-#define M_PI 3.14159265358979323846
+//#define M_PI 3.14159265358979323846
 
 int signum(double x) {
     if (x > 0) {
@@ -16,12 +16,12 @@ int signum(double x) {
 }
 int power_function(double phase_shift, double Udc1, double Udc2, double fp, double L)
 {
-    double power = signum(phase_shift) * (Udc1 * Udc2 * abs(phase_shift) * (M_PI - abs(phase_shift))) / (2 * pow(M_PI, 2) * fp * L);
+    double power = signum(phase_shift) * (Udc1 * Udc2 * fabs(phase_shift) * (M_PI - fabs(phase_shift))) / (2 * pow(M_PI, 2) * fp * L);
     return power;
 }
 int phase_shift(double Ich2, double Udc1, double L, double fp)
 {
-    double delta = signum(Ich2) * (M_PI / 2) * (sqrt(pow(Udc1, 2) - 8 * Udc1 * L * fp * abs(Ich2))) / (Udc1);
+    double delta = signum(Ich2) * (M_PI / 2) * (sqrt(pow(Udc1, 2) - 8 * Udc1 * L * fp * fabs(Ich2))) / (Udc1);
     return delta;
 }
 
@@ -132,8 +132,8 @@ int * modulator(float power){
 
 DLLEXPORT void plecsSetSizes(struct SimulationSizes* aSizes)
 {
-aSizes->numInputs = 1;
-aSizes->numOutputs = 1;
+aSizes->numInputs = 4;
+aSizes->numOutputs = 4;
 aSizes->numStates = 0;
 aSizes->numParameters = 0; //number of user parameters passed in
 }
@@ -147,11 +147,11 @@ DLLEXPORT void plecsStart(struct SimulationState* aState){
 DLLEXPORT void plecsOutput(struct SimulationState* aState)
 {
   int *phaseshiftOutputs;
-  phaseshiftOutputs = modulator(aState->numInputs[0])
-aState->outputs[0] = * phaseshiftOutputs[0]
-aState->outputs[1] = * phaseshiftOutputs[1]
-aState->outputs[2] = * phaseshiftOutputs[2]
-aState->outputs[3] = * phaseshiftOutputs[3]
+  phaseshiftOutputs = modulator(aState->inputs[0]);
+  aState->outputs[0] =  phaseshiftOutputs[0];
+  aState->outputs[1] =  phaseshiftOutputs[1];
+  aState->outputs[2] =  phaseshiftOutputs[2];
+  aState->outputs[3] =  phaseshiftOutputs[3];
 //aState->outputs[0] = PICalc(&PI1, aState->inputs[0], aState->inputs[1]); // input 0 is refference, input 1 is feedback
 //aState->outputs[1] = aState->inputs[0];
 }
